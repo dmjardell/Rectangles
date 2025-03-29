@@ -3,30 +3,20 @@ import tkinter as tk
 WINDOWTITLE = "Rectangles"
 WINDOWSIZE = "800x600"
 GAMEAREA = "800x600"
+WIDTH, HEIGHT = 800, 600
 
-class Game:
-    def __init__(self, root, GAMEAREA, gameTitle):
-        self.root = root
+class GameGUI:
+    def __init__(self, game):
+        self.root = tk.Tk()
+        self.game = game
         self.root.geometry(GAMEAREA)
-        self.root.title(gameTitle)
-        self.canvas = tk.Canvas(
-                root, width=GAMEAREA.split("x")[0],
-                height=GAMEAREA.split("x")[1], bg="white")
+        self.root.title(WINDOWTITLE)
+        self.canvas = tk.Canvas(width=WIDTH, height=HEIGHT, bg="white")
         self.canvas.pack()
-        self.objects = []
+        self.root.bind("<KeyPress>", self.handle_key_press)
+        self.running = True
 
-    def start(self):
-        self.root.bind("<KeyPress>", self.handleKeyPress)
-
-    def create_player(self, Rectangle):
-        self.player = Rectangle
-        self.player.draw(self.canvas)
-
-    def create_object(self, obj):
-        self.objects.append(obj)
-        obj.draw(self.canvas)
-
-    def handleKeyPress(self, event):
+    def handle_key_press(self, event):
         moves = {
             "Up": (0, -10),
             "Down": (0, 10),
@@ -34,17 +24,50 @@ class Game:
             "Right": (10, 0)
             }
         if event.keysym in moves:
-            if not (self.player.is_out_of_bounds(
-                GAMEAREA, *moves[event.keysym])
-                    or self.player.is_colliding_rect(*moves[event.keysym],
-                                                     self.objects[0])):
+            print(f"Attempting to move player:{self.game.player.player_name}:{event.keysym}")
+            if not (self.game.player.is_out_of_bounds(GAMEAREA, *moves[event.keysym])
+                    or self.game.check_collisions(self.game.player, *moves[event.keysym])):
+                print("move")
+                self.game.player.move(self.canvas, *moves[event.keysym])
+            else:
+                print("Collision or out of bounds detected")
+        print(f"{self.game.player.player_name}({self.game.player.x}, {self.game.player.y})")
 
-                self.player.move(self.canvas, *moves[event.keysym])
-                print(self.objects[0].x)
+    # Render all of the games' objects
+    def render(self):
+        if not self.game.objects:
+            print("GameGUI.render() -> There are no objects to render.")
+            return
+        for obj in self.game.objects:
+            obj.draw(self.canvas)
+
+
+class Game:
+    def __init__(self, game_area, game_title):
+        self.objects = []
+        self.game_area = game_area
+        self.game_title = game_title
+
+    def create_player(self, Player):
+        self.player = Player
+        self.objects.append(self.player)
+
+    def create_object(self, obj):
+        self.objects.append(obj)
+
+    def check_collisions(self, this_object, dx, dy):
+        for obj in self.objects:
+            # Check if obj is the same object as this_object which would trigger a collision with it self
+            if obj is this_object:
+                continue
+            if this_object.is_colliding_rect(dx, dy, obj):
+                return True
+
+        return False
 
 
 class Rectangle:
-    def __init__(self, x, y, width, height, color):
+    def __init__(self, *, x, y, width, height, color):
         self.x = x
         self.y = y
         self.width = width
@@ -67,7 +90,8 @@ class Rectangle:
 
     def is_out_of_bounds(self, GAMEAREA, dx, dy):
         width, height = map(int, GAMEAREA.split("x"))
-        if(self.x + self.width + dx >= width or self.y + self.height + dy >= height
+        if (self.x + self.width + dx >= width
+           or self.y + self.height + dy >= height
            or self.x + dx <= 0 or self.y + dy <= 0):
             return True
         return False
@@ -80,11 +104,16 @@ class Rectangle:
             return True
         return False
 
+class Player(Rectangle):
+    def __init__(self, *, player_name, **kwargs):
+        super().__init__(**kwargs)
+        self.player_name = player_name
 
 
-root = tk.Tk()
-game = Game(root, GAMEAREA, WINDOWTITLE)
-game.create_player(Rectangle(400, 300, 100, 100, "blue"))
-game.create_object(Rectangle(200, 50, 100, 100, "red"))
-game.start()
-root.mainloop()
+game = Game(GAMEAREA, WINDOWTITLE)
+game.create_player(Player(x=400, y=300, width=100, height=100, color="blue", player_name="Player"))
+game.create_object(Rectangle(x=200, y=50, width=100, height=100, color="red"))
+game.create_object(Rectangle(x=90, y=500, width=50, height=90, color="red"))
+gui = GameGUI(game)
+gui.render()
+gui.root.mainloop()
